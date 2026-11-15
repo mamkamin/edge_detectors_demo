@@ -1,7 +1,14 @@
 from PySide6.QtCore import Qt
 import torch
 import sys
-from PySide6.QtWidgets import QApplication, QLabel, QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QGridLayout,
+    QLabel,
+    QMainWindow,
+    QPushButton,
+    QWidget,
+)
 
 WIN_TITLE = "Edge detectors Demo"
 WIN_WIDTH = 1200
@@ -15,11 +22,22 @@ class MainWindow(QMainWindow):
         self.resize(WIN_WIDTH, WIN_HEIGHT)
 
         central = QWidget()
-        layout = QVBoxLayout(central)
-        layout.addWidget(
-            QLabel(f"Cuda available: {torch.cuda.is_available()}"),
-            alignment=Qt.AlignmentFlag.AlignCenter,
-        )
+        grid = QGridLayout(central)
+
+        label = QLabel(f"Cuda available: {torch.cuda.is_available()}")
+        load_img_button = QPushButton("Load image")
+        sobel_button = QPushButton("Sobel Operator")
+        canny_button = QPushButton("Canny Operator")
+        pidinet_button = QPushButton("PiDiNet Operator")
+
+        grid.addWidget(label, 0, 0, 4, 1, alignment=Qt.AlignmentFlag.AlignCenter)
+        grid.addWidget(load_img_button, 0, 1)
+        grid.addWidget(sobel_button, 1, 1)
+        grid.addWidget(canny_button, 2, 1)
+        grid.addWidget(pidinet_button, 3, 1)
+        grid.setColumnStretch(0, 2)
+        grid.setColumnStretch(1, 1)
+
         self.setCentralWidget(central)
 
 
