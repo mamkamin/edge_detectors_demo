@@ -38,6 +38,8 @@ class MainWindow(QMainWindow):
         sobel_button.clicked.connect(self.apply_sobel)
 
         canny_button = QPushButton("Canny Operator")
+        canny_button.clicked.connect(self.apply_canny)
+
         pidinet_button = QPushButton("PiDiNet Operator")
 
         grid.addWidget(
@@ -83,7 +85,19 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def apply_canny(self):
-        pass
+        if not self.current_path:
+            return
+        gray = cv2.imread(self.current_path, cv2.IMREAD_GRAYSCALE)
+
+        if gray is None:
+            return
+
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        edges = cv2.Canny(
+            blur, threshold1=50, threshold2=150, apertureSize=3, L2gradient=False
+        )
+        self.result = edges
+        self.show_image(edges)
 
     @Slot()
     def apply_pidinet(self):
