@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt, Slot
-from PySide6.QtGui import QPixmap
-import torch
+from PySide6.QtGui import QPixmap, QImage
+import cv2
 import sys
 from PySide6.QtWidgets import (
     QApplication,
@@ -26,12 +26,17 @@ class MainWindow(QMainWindow):
         central = QWidget()
         grid = QGridLayout(central)
 
+        self.current_path = ""
         self.image_label = QLabel("No Image loaded")
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setMinimumSize(600, 400)
+
         load_img_button = QPushButton("Load image")
         load_img_button.clicked.connect(self.load_image)
+
         sobel_button = QPushButton("Sobel Operator")
+        sobel_button.clicked.connect(self.apply_sobel)
+
         canny_button = QPushButton("Canny Operator")
         pidinet_button = QPushButton("PiDiNet Operator")
 
@@ -47,6 +52,43 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(central)
 
+    def show_image(self, img):
+        """
+        Convert image from cv Mat to QImage and render it
+        """
+        h, w = img.shape
+        qimg = QImage(img.data, w, h, w, QImage.Format_Grayscale8).copy()
+        self.image_label.setPixmap(
+            QPixmap.fromImage(qimg).scaled(self.image_label.size(), Qt.KeepAspectRatio)
+        )
+
+    @Slot()
+    def apply_sobel(self):
+        if not self.current_path:
+            return
+        gray = cv2.imread(self.current_path, cv2.IMREAD_GRAYSCALE)
+        if gray is None:
+            return
+
+        gray = cv2.GaussianBlur(gray, (3, 3), 0)
+
+        gx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+        gy = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+
+        mag = cv2.magnitude(gx, gy)
+        edges = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+
+        self.result = edges
+        self.show_image(edges)
+
+    @Slot()
+    def apply_canny(self):
+        pass
+
+    @Slot()
+    def apply_pidinet(self):
+        pass
+
     @Slot()
     def load_image(self):
         """
@@ -57,6 +99,7 @@ class MainWindow(QMainWindow):
         )
         if not path:
             return
+        self.current_path = path
         pix = QPixmap(path)
         self.image_label.setPixmap(
             pix.scaled(
