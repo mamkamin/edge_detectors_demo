@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pidinet_detector import PiDiNetDetector
+
 WIN_TITLE = "Edge detectors Demo"
 WIN_WIDTH = 1200
 WIN_HEIGHT = 700
@@ -115,15 +117,18 @@ class MainWindow(QMainWindow):
         self.image = None  # original (BGR), read once on load
         self.gray = None  # grayscale copy used by every detector
         self.results = {}  # detector name -> edge map
+        self.pidinet = None  # PiDiNetDetector, loaded on first use (slow to load)
 
         self.original_panel = ImagePanel("Original")
         self.sobel_panel = ImagePanel("Sobel")
         self.canny_panel = ImagePanel("Canny")
+        self.pidinet_panel = ImagePanel("PiDiNet")
 
         panels = QHBoxLayout()
         panels.addWidget(self.original_panel)
         panels.addWidget(self.sobel_panel)
         panels.addWidget(self.canny_panel)
+        panels.addWidget(self.pidinet_panel)
 
         load_img_button = QPushButton("Load image")
         load_img_button.clicked.connect(self.load_image)
@@ -136,8 +141,6 @@ class MainWindow(QMainWindow):
 
         pidinet_button = QPushButton("PiDiNet Operator")
         pidinet_button.clicked.connect(self.apply_pidinet)
-        pidinet_button.setEnabled(False)  # enable once PiDiNet is wired in
-        pidinet_button.setToolTip("Coming soon")
 
         buttons = QHBoxLayout()
         buttons.addWidget(load_img_button)
@@ -169,7 +172,14 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def apply_pidinet(self):
-        pass
+        if self.image is None:
+            return
+        if self.pidinet is None:
+            self.pidinet = PiDiNetDetector()
+        # PiDiNet is a CNN trained on color images, so it takes the BGR original
+        edges = self.pidinet.detect(self.image)
+        self.results["pidinet"] = edges
+        self.pidinet_panel.set_image(edges)
 
     @Slot()
     def load_image(self):
@@ -192,6 +202,7 @@ class MainWindow(QMainWindow):
         self.original_panel.set_image(self.image)
         self.sobel_panel.clear()
         self.canny_panel.clear()
+        self.pidinet_panel.clear()
 
 
 if __name__ == "__main__":
