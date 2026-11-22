@@ -3,6 +3,7 @@ from PySide6.QtGui import QPixmap, QImage
 import cv2
 import numpy as np
 import sys
+import time
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -22,6 +23,10 @@ WIN_WIDTH = 1200
 WIN_HEIGHT = 700
 PANEL_MIN_SIZE = 300
 
+SOBEL_KSIZE = 3
+CANNY_LOW_THRESHOLD = 50
+CANNY_HIGH_THRESHOLD = 150
+
 
 def to_qimage(img):
     """
@@ -39,8 +44,8 @@ def to_qimage(img):
 
 def sobel_edges(gray):
     blur = cv2.GaussianBlur(gray, (3, 3), 0)
-    gx = cv2.Sobel(blur, cv2.CV_64F, 1, 0, ksize=3)
-    gy = cv2.Sobel(blur, cv2.CV_64F, 0, 1, ksize=3)
+    gx = cv2.Sobel(blur, cv2.CV_64F, 1, 0, ksize=SOBEL_KSIZE)
+    gy = cv2.Sobel(blur, cv2.CV_64F, 0, 1, ksize=SOBEL_KSIZE)
     mag = cv2.magnitude(gx, gy)
     return cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
 
@@ -48,13 +53,27 @@ def sobel_edges(gray):
 def canny_edges(gray):
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
     return cv2.Canny(
-        blur, threshold1=50, threshold2=150, apertureSize=3, L2gradient=False
+        blur,
+        threshold1=CANNY_LOW_THRESHOLD,
+        threshold2=CANNY_HIGH_THRESHOLD,
+        apertureSize=3,
+        L2gradient=False,
     )
+
+
+def timed(detect, image):
+    """
+    Run a detector and return (edge map, elapsed time in ms)
+    """
+    start = time.perf_counter()
+    edges = detect(image)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    return edges, elapsed_ms
 
 
 class ImagePanel(QWidget):
     """
-    A titled image area with a caption underneath (caption will hold the ms timing)
+    A titled image area with a caption underneath (detector settings and timing)
     """
 
     def __init__(self, title):
@@ -85,6 +104,9 @@ class ImagePanel(QWidget):
     def set_image(self, img):
         self._pixmap = QPixmap.fromImage(to_qimage(img))
         self._rescale()
+
+    def set_caption(self, text):
+        self.caption_label.setText(text)
 
     def clear(self):
         self._pixmap = None
@@ -158,17 +180,24 @@ class MainWindow(QMainWindow):
     def apply_sobel(self):
         if self.gray is None:
             return
-        edges = sobel_edges(self.gray)
+        edges, ms = timed(sobel_edges, self.gray)
         self.results["sobel"] = edges
         self.sobel_panel.set_image(edges)
+        # Sobel has no threshold: it shows the normalized gradient magnitude
+        self.sobel_panel.set_caption(
+            f"Kernel {SOBEL_KSIZE}x{SOBEL_KSIZE}, no threshold  |  {ms:.1f} ms"
+        )
 
     @Slot()
     def apply_canny(self):
         if self.gray is None:
             return
-        edges = canny_edges(self.gray)
+        edges, ms = timed(canny_edges, self.gray)
         self.results["canny"] = edges
         self.canny_panel.set_image(edges)
+        self.canny_panel.set_caption(
+            f"Thresholds {CANNY_LOW_THRESHOLD} / {CANNY_HIGH_THRESHOLD}  |  {ms:.1f} ms"
+        )
 
     @Slot()
     def apply_pidinet(self):
@@ -177,9 +206,12 @@ class MainWindow(QMainWindow):
         if self.pidinet is None:
             self.pidinet = PiDiNetDetector()
         # PiDiNet is a CNN trained on color images, so it takes the BGR original
-        edges = self.pidinet.detect(self.image)
+        edges, ms = timed(self.pidinet.detect, self.image)
         self.results["pidinet"] = edges
         self.pidinet_panel.set_image(edges)
+        # PiDiNet has no threshold: it shows the raw edge probability map
+        device = self.pidinet.device.type.upper()
+        self.pidinet_panel.set_caption(f"No threshold, {device}  |  {ms:.1f} ms")
 
     @Slot()
     def load_image(self):

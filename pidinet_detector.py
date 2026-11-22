@@ -36,6 +36,7 @@ class PiDiNetDetector:
     def __init__(self, checkpoint_path=CHECKPOINT_PATH):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = self._load_model(checkpoint_path)
+        self._warm_up()
 
     def _load_model(self, checkpoint_path):
         model = pidinet_converted(MODEL_ARGS)
@@ -49,6 +50,13 @@ class PiDiNetDetector:
         model.load_state_dict(convert_pidinet(state_dict, MODEL_ARGS.config))
 
         return model.to(self.device).eval()
+
+    def _warm_up(self):
+        """
+        The first forward pass is slow (CUDA/cuDNN setup), so run it once here
+        to keep the timing shown in the UI representative of the model itself
+        """
+        self.detect(np.zeros((64, 64, 3), dtype=np.uint8))
 
     def _to_tensor(self, bgr):
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
